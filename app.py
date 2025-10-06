@@ -4,7 +4,8 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 from streamlit_drawable_canvas import st_canvas
 from datetime import datetime
-import io, os, base64
+from PIL import Image
+import io, os
 
 st.set_page_config(layout="wide", page_title="Registro Frecce Mobile")
 
@@ -12,12 +13,10 @@ st.title("🏹 Registro Frecce – Allenamento Mobile")
 
 STORICO_FILE = "storico_frecce.csv"
 
-# === inizializza file storico se non esiste ===
 if not os.path.exists(STORICO_FILE):
     df_vuoto = pd.DataFrame(columns=["datetime", "session_id", "volee", "freccia", "x", "y", "punteggio", "distanza"])
     df_vuoto.to_csv(STORICO_FILE, index=False)
 
-# === input iniziali ===
 distanza = st.selectbox("📏 Seleziona la distanza (m)", ["18", "30", "50", "70", "90"])
 frecce_per_volee = st.selectbox("🎯 Frecce per volee", [3, 6])
 session_id = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
@@ -25,7 +24,6 @@ session_id = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 if "colpi" not in st.session_state:
     st.session_state.colpi = []
 
-# === funzioni ===
 def calcola_punteggio(x, y):
     distanza = (x**2 + y**2)**0.5
     for raggio, punti in zip(range(10, 0, -1), range(1, 11)):
@@ -33,7 +31,7 @@ def calcola_punteggio(x, y):
             return punti
     return 0
 
-def genera_bersaglio_base64():
+def genera_bersaglio_image():
     fig, ax = plt.subplots(figsize=(6, 6))
     colori = ['white', 'black', 'blue', 'red', 'yellow']
     r = 10
@@ -50,17 +48,14 @@ def genera_bersaglio_base64():
     plt.savefig(buf, format="png", bbox_inches='tight', dpi=150)
     buf.seek(0)
     plt.close(fig)
+    return Image.open(buf)  # 👈 ritorna PIL.Image
 
-    encoded = base64.b64encode(buf.getvalue()).decode()
-    return f"data:image/png;base64,{encoded}"
-
-# === mostra bersaglio con canvas interattivo ===
 st.subheader("🖐️ Tocca sul bersaglio per segnare i colpi")
-bg_base64 = genera_bersaglio_base64()
+image = genera_bersaglio_image()
 
 canvas_result = st_canvas(
     fill_color="rgba(0, 255, 0, 0.3)",
-    background_image=bg_base64,
+    background_image=image,  # 👈 ora passa PIL.Image
     update_streamlit=True,
     height=500,
     width=500,
@@ -69,14 +64,12 @@ canvas_result = st_canvas(
     key="canvas"
 )
 
-# === gestisci click ===
 if canvas_result.json_data is not None:
     objects = canvas_result.json_data.get("objects", [])
     if len(objects) > len(st.session_state.colpi):
         last = objects[-1]
         canvas_x = last["left"]
         canvas_y = last["top"]
-        # normalizza coordinate tra [-10,10]
         x_norm = (canvas_x / 500) * 20 - 10
         y_norm = (500 - canvas_y) / 500 * 20 - 10
         if len(st.session_state.colpi) < frecce_per_volee:
@@ -84,12 +77,10 @@ if canvas_result.json_data is not None:
         else:
             st.warning("Hai già registrato tutte le frecce per questa volee.")
 
-# === mostra frecce raccolte ===
 st.write("📌 Frecce registrate finora:")
 for i, (x, y) in enumerate(st.session_state.colpi):
     st.write(f"• Freccia {i+1}: x={x:.2f}, y={y:.2f} → punti: {calcola_punteggio(x,y)}")
 
-# === salva volee ===
 if st.button("💾 Salva volee"):
     if not st.session_state.colpi:
         st.error("⚠️ Nessuna freccia registrata.")
