@@ -2,88 +2,85 @@ import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
-from streamlit_drawable_canvas import st_canvas
 from datetime import datetime
-from PIL import Image
-import io, os
+import os
 
-st.set_page_config(layout="wide", page_title="Registro Frecce Mobile")
+# === Configura pagina ===
+st.set_page_config(layout="centered", page_title="Registro Frecce")
 
-st.title("🏹 Registro Frecce – Allenamento Mobile")
+st.title("🎯 Registro Frecce - Allenamento")
 
+# === File dati ===
 STORICO_FILE = "storico_frecce.csv"
 
+# === Inizializza file se non esiste ===
 if not os.path.exists(STORICO_FILE):
     df_vuoto = pd.DataFrame(columns=["datetime", "session_id", "volee", "freccia", "x", "y", "punteggio", "distanza"])
     df_vuoto.to_csv(STORICO_FILE, index=False)
 
-distanza = st.selectbox("📏 Seleziona la distanza (m)", ["18", "30", "50", "70", "90"])
-frecce_per_volee = st.selectbox("🎯 Frecce per volee", [3, 6])
+# === Input iniziali ===
+distanza = st.selectbox("📏 Seleziona la distanza", ["18", "30", "50", "70", "90"])
+frecce_per_volee = st.selectbox("🏹 Numero di frecce per volee", [3, 6])
+st.write("👇 Tocca sul bersaglio per registrare ogni freccia")
+
+# === Sessione ===
 session_id = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+tiri = []
 
-if "colpi" not in st.session_state:
-    st.session_state.colpi = []
-
+# === Funzioni ===
 def calcola_punteggio(x, y):
-    distanza = (x**2 + y**2)**0.5
+    d = (x**2 + y**2)**0.5
     for raggio, punti in zip(range(10, 0, -1), range(1, 11)):
-        if distanza <= raggio:
+        if d <= raggio:
             return punti
     return 0
 
-def genera_bersaglio_image():
+def disegna_bersaglio(colpi):
     fig, ax = plt.subplots(figsize=(6, 6))
     colori = ['white', 'black', 'blue', 'red', 'yellow']
     r = 10
-    for colore in colori:
+    for c in colori:
         for _ in range(2):
-            ax.add_patch(patches.Circle((0, 0), r, color=colore, ec='black'))
+            ax.add_patch(patches.Circle((0, 0), r, color=c, ec='black'))
             r -= 1
+
+    for i, (x, y) in enumerate(colpi):
+        ax.plot(x, y, 'x', color='limegreen', markersize=8)
+        ax.text(x + 0.3, y + 0.3, str(i+1), fontsize=10)
+
     ax.set_xlim(-10, 10)
     ax.set_ylim(-10, 10)
     ax.set_aspect('equal')
     ax.axis('off')
+    return fig
 
-    buf = io.BytesIO()
-    plt.savefig(buf, format="png", bbox_inches='tight', dpi=150)
-    buf.seek(0)
-    plt.close(fig)
-    return Image.open(buf)  # 👈 ritorna PIL.Image
+# === Interfaccia interattiva ===
+coord_colpi = []
 
-st.subheader("🖐️ Tocca sul bersaglio per segnare i colpi")
-image = genera_bersaglio_image()
+with st.container():
+    colpi = st.session_state.get("colpi", [])
 
-canvas_result = st_canvas(
-    fill_color="rgba(0, 255, 0, 0.3)",
-    background_image=image,  # 👈 ora passa PIL.Image
-    update_streamlit=True,
-    height=500,
-    width=500,
-    drawing_mode="point",
-    point_display_radius=4,
-    key="canvas"
-)
+    fig = disegna_bersaglio(colpi)
+    click = st.pyplot(fig, clear_figure=True)
 
-if canvas_result.json_data is not None:
-    objects = canvas_result.json_data.get("objects", [])
-    if len(objects) > len(st.session_state.colpi):
-        last = objects[-1]
-        canvas_x = last["left"]
-        canvas_y = last["top"]
-        x_norm = (canvas_x / 500) * 20 - 10
-        y_norm = (500 - canvas_y) / 500 * 20 - 10
+    if "colpi" not in st.session_state:
+        st.session_state.colpi = []
+
+    st.write("⬇️ Tocca il bersaglio per registrare (solo simulazione)")
+
+    # Pseudo-click manuale per Streamlit (coordinate simulate)
+    x = st.slider("X", -10.0, 10.0, 0.0, 0.1)
+    y = st.slider("Y", -10.0, 10.0, 0.0, 0.1)
+    if st.button("➕ Aggiungi Freccia"):
         if len(st.session_state.colpi) < frecce_per_volee:
-            st.session_state.colpi.append((x_norm, y_norm))
+            st.session_state.colpi.append((x, y))
         else:
             st.warning("Hai già registrato tutte le frecce per questa volee.")
 
-st.write("📌 Frecce registrate finora:")
-for i, (x, y) in enumerate(st.session_state.colpi):
-    st.write(f"• Freccia {i+1}: x={x:.2f}, y={y:.2f} → punti: {calcola_punteggio(x,y)}")
-
+# === Salvataggio ===
 if st.button("💾 Salva volee"):
     if not st.session_state.colpi:
-        st.error("⚠️ Nessuna freccia registrata.")
+        st.error("Nessuna freccia registrata.")
     else:
         df_nuovo = pd.DataFrame([
             {
@@ -101,5 +98,5 @@ if st.button("💾 Salva volee"):
         df_storico = pd.read_csv(STORICO_FILE)
         df_finale = pd.concat([df_storico, df_nuovo], ignore_index=True)
         df_finale.to_csv(STORICO_FILE, index=False)
-        st.success("✅ Volee salvata con successo!")
+        st.success("✅ Volee salvata!")
         st.session_state.colpi = []
