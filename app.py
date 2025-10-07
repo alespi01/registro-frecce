@@ -67,7 +67,7 @@ if "colpi" not in st.session_state:
 clicked_point = st.session_state.get("clicked_point", None)
 selected_data = st.session_state.get("selected_data", None)
 
-selected = st.get_query_params().get("selected")
+
 
 if "plotly_click_data" in st.session_state:
     point = st.session_state["plotly_click_data"]["points"][0]
