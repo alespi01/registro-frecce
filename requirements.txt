@@ -1,5 +1,4 @@
 streamlit
-pandas
-numpy
+streamlit-drawable-canvas
 matplotlib
-plotly
+pandas
