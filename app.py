@@ -43,26 +43,42 @@ df = pd.DataFrame({
 })
 
 # === Plot ===
-fig = px.scatter(df, x="x", y="y", color="score", 
-                 color_continuous_scale=[
-                     (0.0, "white"),
-                     (0.2, "black"),
-                     (0.4, "blue"),
-                     (0.6, "red"),
-                     (1.0, "yellow")
-                 ],
-                 range_color=[1, 10],
-                 opacity=0.7,
-                 width=600,
-                 height=600
-                )
-fig.update_traces(marker=dict(size=5))
+# === Plot === (updated with discrete colors)
+color_map = {
+    10: "gold",
+    9: "gold",
+    8: "red",
+    7: "red",
+    6: "blue",
+    5: "blue",
+    4: "black",
+    3: "black",
+    2: "white",
+    1: "white",
+    0: "gray"
+}
+
+df["color"] = df["score"].map(color_map)
+
+fig = px.scatter(
+    df, x="x", y="y",
+    color="color",
+    color_discrete_map=color_map,
+    opacity=0.6
+)
+
+fig.update_traces(marker=dict(size=3))
 fig.update_layout(
-    yaxis=dict(scaleanchor="x", scaleratio=1),
+    width=600,
+    height=600,
+    showlegend=False,
     dragmode="pan",
     clickmode="event+select",
-    showlegend=False
+    xaxis=dict(range=[-10.5, 10.5], zeroline=False),
+    yaxis=dict(range=[-10.5, 10.5], scaleanchor="x", zeroline=False),
+    margin=dict(t=20, r=20, b=20, l=20),
 )
+
 
 st.subheader("🖐️ Clicca sul bersaglio per registrare la freccia")
 
